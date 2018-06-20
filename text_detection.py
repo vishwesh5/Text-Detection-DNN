@@ -229,6 +229,9 @@ if __name__ == "__main__":
             # vertices = [tuple(pt) for pt in vertices]
             # Plot the rectangle
             # frame = plotRectFromPoints(vertices,image=frame)
+        
+        # Resize image back to original height and width
+        frame = cv2.resize(frame, (frameWidth, frameHeight), interpolation = cv2.INTER_CUBIC)
 
         # Put efficiency information
         t, _ = net.getPerfProfile()
