@@ -24,7 +24,7 @@ g++ text_detection.cpp `pkg-config opencv --cflags --libs`
 Refer to the following to use the compiled file:
 
 ```
-./a.out -i <input image path> -m <pb model path>
+./a.out --input <input image path> --model <pb model path>
 ```
 
 ## Using the Python code
@@ -34,5 +34,11 @@ Refer to the following to use the compiled file:
 Refer to the following to use the Python script:
 
 ```
-python3 text_detection.py -i <image_path> -m <model_path>
+python3 text_detection.py --input <image_path> --model <model_path>
 ```
+
+## Results
+
+### Using **`text_detection.cpp`**
+
+### Using **`text_detection.py`**
