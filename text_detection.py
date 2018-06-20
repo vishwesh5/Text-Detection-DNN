@@ -1,31 +1,40 @@
+# Import required modules
+
 import cv2
-import math
 import numpy as np
-from math import *
-from util import *
-
+import argparse
+from math import sin,cos, PI
 import sys
-import matplotlib.pyplot as plt
-# const char* keys =
-#     "{ help  h     | | Print help message. }"
-#     "{ input i     | | Path to input image or video file. Skip this argument to capture frames from a camera.}"
-#     "{ model m     | | Path to a binary .pb file contains trained network.}"
-#     "{ width       | 320 | Preprocess input image by resizing to a specific width. It should be multiple by 32. }"
-#     "{ height      | 320 | Preprocess input image by resizing to a specific height. It should be multiple by 32. }"
-#     "{ thr         | 0.5 | Confidence threshold. }"
-#     "{ nms         | 0.4 | Non-maximum suppression threshold. }";
 
-# path of image for now
-i = sys.argv[1]
-# model path - .pb format (for tensorflow)
-m = "frozen_east_text_detection.pb"
-# width and height - default values
-width = 320
-height = 320
+############ Add argument parser for command line arguments ############
 
-# thresholds
-thr = 0.5
-nms = 0.4
+parser = argparse.ArgumentParser(description='Use this script to run text detection deep learning networks using OpenCV.')
+# Input argument
+parser.add_argument('--input', help='Path to input image or video file. Skip this argument to capture frames from a camera.')
+# Model argument
+parser.add_argument('--model', required=True,
+                    help='Path to a binary .pb file of model contains trained weights.'
+                    )
+# Width argument
+parser.add_argument('--width', type=int, default=320,
+                    help='Preprocess input image by resizing to a specific width. It should be multiple by 32.'
+                   )
+# Height argument
+parser.add_argument('--height',type=int, default=320,
+                    help='Preprocess input image by resizing to a specific height. It should be multiple by 32.'
+                   )
+# Confidence threshold
+parser.add_argument('--thr',type=float, default=0.5,
+                    help='Confidence threshold.'
+                   )
+# Non-maximum suppression threshold
+parser.add_argument('--nms',type=float, default=0.4,
+                    help='Non-maximum suppression threshold.'
+                   )
+
+args = parser.parse_args()
+
+############ Utility functions ############
 
 def createBlankCanvas(color=(0,0,0),height=300,width=300):
     """
@@ -85,18 +94,27 @@ def rotatedRect(center,size,image=None,angle=0,color=(255,255,255),lineThickness
     bbox = [min_X,min_Y,max_X-min_X,max_Y-min_Y]
     return bbox
 
-# void decode(const Mat& scores, const Mat& geometry, float scoreThresh,
-            # std::vector<RotatedRect>& detections, std::vector<float>& confidences);
 def decode(frame, scores, geometry, scoreThresh):
-    # CV_ASSERT(scores.dims == 4, geometry.dims == 4, scores.size[0] == 1,
-    #          geometry.size[0] == 1, scores.size[1] == 1, geometry.size[1] == 5,
-    #          scores.size[2] == geometry.size[2], scores.size[3] == geometry.size[3])
+    
+    ############ CHECK DIMENSIONS AND SHAPES OF geometry AND scores ############
+    assert len(scores.shape) == 4, "Incorrect dimensions of scores"
+    assert len(geometry.shape) == 4, "Incorrect dimensions of geometry"
+    assert scores.shape[0] == 1, "Invalid dimensions of scores"
+    assert geometry.shape[0] == 1, "Invalid dimensions of geometry"
+    assert scores.shape[1] == 1, "Invalid dimensions of scores"
+    assert geometry.shape[1] == 5, "Invalid dimensions of geometry"
+    assert scores.shape[2] == geometry.shape[2], "Invalid dimensions of scores and geometry"
+    assert scores.shape[3] == geometry.shape[3], "Invalid dimensions of scores and geometry"
+    
+    # Initialize detections and confidences
     detections = []
     confidences = []
+    
     height = scores.shape[2]
     width = scores.shape[3]
 
     for y in range(0, height):
+        # Extract data from scores
         scoresData = scores[0][0][y]
         x0_data = geometry[0][0][y]
         x1_data = geometry[0][1][y]
@@ -106,77 +124,116 @@ def decode(frame, scores, geometry, scoreThresh):
 
         for x in range(0, width):
             score = scoresData[x]
+            
+            # If score is lower than threshold score, move to next x
             if(score < scoreThresh):
                 continue
+                
+            # Calculate offset
             offsetX = x * 4.0
             offsetY = y * 4.0
+            
             angle = anglesData[x]
-            cosA = math.cos(angle)
-            sinA = math.sin(angle)
+            
+            # Calculate cos and sin of angle
+            cosA = cos(angle)
+            sinA = sin(angle)
+            
             h = x0_data[x] + x2_data[x]
             w = x1_data[x] + x3_data[x]
-            # print(h, w)
+            
+            # Calculate offset
             offset = np.array([offsetX + cosA * x1_data[x] + sinA * x2_data[x], offsetY - sinA * x1_data[x] + cosA * x2_data[x]])
-            print(sinA, h, cosA, w, offset[0], offset[1])
+            # Find points for rectangle
             p1 = [-sinA * h, -cosA * h] + offset
             p3 = [-cosA * w, sinA * w] + offset
-            print("p1, p3, w, h : ", p1, p3, w, h)
-            # print(0.5 * (p1 ))
+            # r should be a rotated rectangle, but it is giving poor results
+            # TO BE FIXED
+            
             # r = rotatedRect((0.5 * (p1[0] + p3[0]), 0.5 * (p1[1] + p3[1])), (w, h), frame, -angle)
-            # r = [0.5 * (p1 + p3), (w, h), -angle]
+            
+            # Append the bounding box rectangle
             r = [p1[0], p1[1], p3[0], p3[1]]
             detections.append(r)
+            # Append score
             confidences.append(float(score))
+    # Return detections and confidences
     return [detections, confidences]
     
-if __name__ == "__main__":
-    confThreshold = thr
-    nmsThreshold = nms
-    inpWidth = width
-    inpHeight = height
-
-    model = m
-
-    # Load network.
-    net = cv2.dnn.readNet(model)
     
-
+if __name__ == "__main__":
+    # Read and store arguments
+    confThreshold = args.thr
+    nmsThreshold = args.nms
+    inpWidth = args.width
+    inpHeight = args.height
+    model = args.model
+    
+    # Load network
+    net = cv2.dnn.readNet(model)
+    # Create a new named window
     kWinName = "EAST: An Efficient and Accurate Scene Text Detector"
     cv2.namedWindow(kWinName, cv2.WINDOW_NORMAL)
 
     outNames = []
     outNames.append("feature_fusion/Conv_7/Sigmoid")
     outNames.append("feature_fusion/concat_3")
-
-
-    frame = cv2.imread(sys.argv[1], 1)
-    frame = cv2.resize(frame, (320, 320), interpolation = cv2.INTER_CUBIC)
-    blob = cv2.dnn.blobFromImage(frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
-    net.setInput(blob)
-    outs = net.forward(outNames)
-
-    scores = outs[0]
-    geometry = outs[1]
-
-    [boxes, confidences] = decode(frame, scores, geometry, confThreshold)
-    print(len(boxes), len(confidences))
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
-    # indices = [131, 241, 97, 26, 300, 411, 311, 105, 238, 406, 33, 94, 292, 30, 217, 256, 82, 263, 88, 393, 267, 276, 271, 381, 69, 122, 230, 330, 174, 259, 385, 39, 154, 147, 48, 354, 307, 321, 43, 287, 314, 102, 181, 341, 373, 77, 150, 166, 388, 135, 170, 127, 202, 358, 220, 140, 21, 177, 303, 214, 367, 73, 325, 328, 145, 163, 365, 212, 371, 283, 152, 401, 143, 318, 16, 183, 297, 332, 223, 274, 278, 397, 184, 402]
-    ratio = (frame.shape[1]/inpWidth, frame.shape[0]/inpHeight)
-    # print(len(indices))
-    for i in range(0, len(indices)):
-        box = boxes[indices[i][0]]
-        # print(box)
-        cv2.rectangle(frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0))
-        # vertices = [list(pt) for pt in getPointsFromBoundingBox(box)]
-        # for j in range(4):
-        #     vertices[j][0] *= ratio[0]
-        #     vertices[j][1] *= ratio[1]
-        # vertices = [list(np.asarray(pt,dtype='uint8')) for pt in vertices]
-        # vertices = [tuple(pt) for pt in vertices]
-        # frame = plotRectFromPoints(vertices,image=frame)
-
+    
+    # Open a video file or an image file or a camera stream
+    cap = cv2.VideoCapture(args.input if args.input else 0)
+    
+    while cv2.waitKey(1) < 0:
+        # Read frame
+        hasFrame, frame = cap.read()
+        # If frame not found
+        if not hasFrame:
+            cv2.waitKey()
+            break
+        # Get frame height
+        frameHeight = frame.shape[0]
+        # Get frame width
+        frameWidth = frame.shape[1]
         
-    cv2.imshow("Frame",frame)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        # Resize the frame to input width and height
+        frame = cv2.resize(frame, (inpWidth, inpHeight), interpolation = cv2.INTER_CUBIC)
+        
+        # Create a 4D blob from frame.
+        blob = cv2.dnn.blobFromImage(frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
+        
+        # Run the model
+        net.setInput(blob)
+        outs = net.forward(outNames)
+        
+        # Get scores and geometry
+        scores = outs[0]
+        geometry = outs[1]
+
+        [boxes, confidences] = decode(frame, scores, geometry, confThreshold)
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold,nmsThreshold)
+
+        # ratio = (frame.shape[1]/inpWidth, frame.shape[0]/inpHeight)
+        for i in range(0, len(indices)):
+            # Get the bounding box
+            box = boxes[indices[i][0]]
+            # Draw the bounding box in green
+            cv2.rectangle(frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0))
+            
+            # The following code is not necessary since the frame has already been resized
+            
+            # Get the vertices of the bounding box
+            # vertices = [list(pt) for pt in getPointsFromBoundingBox(box)] 
+            # for j in range(4):
+            #    vertices[j][0] *= ratio[0]
+            #    vertices[j][1] *= ratio[1]
+            # vertices = [list(np.asarray(pt,dtype='uint8')) for pt in vertices]
+            # vertices = [tuple(pt) for pt in vertices]
+            # Plot the rectangle
+            # frame = plotRectFromPoints(vertices,image=frame)
+
+        # Put efficiency information
+        t, _ = net.getPerfProfile()
+        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
+        cv2.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        
+        # Display the frame
+        cv2.imshow(kWinName,frame)
