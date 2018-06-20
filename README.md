@@ -39,6 +39,14 @@ python3 text_detection.py --input <image_path> --model <model_path>
 
 ## Results
 
+### Test image
+
+![Test image](https://github.com/vishwesh5/Text-Detection-DNN/raw/master/frame-text.jpg)
+
 ### Using **`text_detection.cpp`**
 
+![Result using text_detection.cpp](https://github.com/vishwesh5/Text-Detection-DNN/raw/master/Frame-txt-cpp.png)
+
 ### Using **`text_detection.py`**
+
+![Result using text_detection.py](https://github.com/vishwesh5/Text-Detection-DNN/raw/master/frame-txt-python.png)
