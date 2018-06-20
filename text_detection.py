@@ -3,7 +3,7 @@
 import cv2
 import numpy as np
 import argparse
-from math import sin,cos, PI
+from math import sin,cos, pi
 import sys
 
 ############ Add argument parser for command line arguments ############
