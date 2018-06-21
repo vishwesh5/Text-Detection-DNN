@@ -220,6 +220,10 @@ if __name__ == "__main__":
         # Read frame
         hasFrame, frame = cap.read()
         
+        if not hasFrame:
+            cv2.waitKey()
+            break
+        
         # Get frame height and width
         height_ = frame.shape[0]
         width_ = frame.shape[1]
