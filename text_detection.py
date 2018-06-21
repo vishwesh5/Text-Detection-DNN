@@ -91,7 +91,7 @@ class RotatedRect(point):
         self.lineThickness=lineThickness
         self.angle = angle 
         self.center = point(center)
-        self.h,self.w = size
+        self.w,self.h = size
         # Find coordinates of rectangle before rotation
         verticesOriginal = [(self.center.x-self.w/2, self.center.y-self.h/2),(self.center.x+self.w/2,self.center.y-self.h/2),
                         (self.center.x+self.w/2,self.center.y+self.h/2),(self.center.x-self.w/2,self.center.y+self.h/2)]
@@ -108,8 +108,13 @@ class RotatedRect(point):
     def points(self):
         return self.points
 
-# Draws the rotated rectangle on image
 def drawRotatedRect(r,image):
+    """
+    Function to draw a rotated rectangle on image
+    Arguments:
+        r = rotated rectangle object
+        image = 3D Numpy array; image on which the rotated rectangle has to be drawn
+    """
     # If image argument is not a numpy.ndarray
     if type(image) != type(np.ones((5,5,3))):
         # Create a black 300x300 px image
@@ -120,7 +125,26 @@ def drawRotatedRect(r,image):
     for i in range(len(r.points)):
         cv2.line(image,r.points[i].coords(),r.points[(i+1)%len(r.points)].coords(),r.color,r.lineThickness)
     return image
-	
+
+# Resizes a rotated rectangle object size to frame size
+def resizeToFrame(r,frame):
+    """
+    Function to resize rotated rectangle object according to frame size
+    Arguments:
+        r = rotated rectangle object
+        frame = frame according to the size of which r will be resized
+    """
+    ratio = (frame.shape[1] / args.width , frame.shape[0] / args.height)
+    ratio = point(coords=ratio)
+    print(ratio.x, ratio.y)
+    for i in range(4):
+        pt = r.points[i]
+        pt.x *= ratio.x
+        pt.y *= ratio.y
+        pt.x = int(pt.x)
+        pt.y = int(pt.y)
+        r.points[i] = pt
+    return r	
 
 def decode(frame, scores, geometry, scoreThresh):
     
@@ -181,7 +205,7 @@ def decode(frame, scores, geometry, scoreThresh):
             # r should be a rotated rectangle, but it is giving poor results
             # TO BE FIXED
             
-            r = RotatedRect(center=(0.5 * (p1[0] + p3[0]), 0.5 * (p1[1] + p3[1])), size=(h, w), angle=-angle,image=frame)
+            r = RotatedRect(center=(0.5 * (p1[0] + p3[0]), 0.5 * (p1[1] + p3[1])), size=(w, h), angle=-angle,image=frame)
             # print(r.points,r.bbox)
             
             # Append the rotated rectangle
@@ -247,9 +271,10 @@ if __name__ == "__main__":
             # Get the bounding box
             box = boxes[indices[i][0]]
             # Get the rotated rectangle
-            r = rotatedRectBoxes[indices[i][0]]		
-            # Resize frame
-            frame = cv2.resize(frame, (320, 320), interpolation = cv2.INTER_CUBIC)
+            r = rotatedRectBoxes[indices[i][0]]
+            # Resize to frame
+            r = resizeToFrame(r,frame)
+
             # Draw the bounding box in green
             frame = drawRotatedRect(r,frame)
         
@@ -257,9 +282,6 @@ if __name__ == "__main__":
         t, _ = net.getPerfProfile()
         label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
         cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
-        frame = cv2.resize(frame, (width_, height_), interpolation = cv2.INTER_CUBIC)
     
         # Display the frame
         cv2.imshow(kWinName,frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
