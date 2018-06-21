@@ -49,4 +49,4 @@ python3 text_detection.py --input <image_path> --model <model_path>
 
 ### Using **`text_detection.py`**
 
-![Result using text_detection.py](https://github.com/vishwesh5/Text-Detection-DNN/raw/master/frame-text-python.png)
+![Result using text_detection.py](https://github.com/vishwesh5/Text-Detection-DNN/raw/master/frame-text-python-modified.png)
