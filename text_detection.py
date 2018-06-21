@@ -3,8 +3,7 @@
 import cv2
 import numpy as np
 import argparse
-from math import sin,cos, pi
-import sys
+from math import sin,cos
 
 ############ Add argument parser for command line arguments ############
 
@@ -54,9 +53,21 @@ def createBlankCanvas(color=(0,0,0),height=300,width=300):
     img[:,:,2] = red
     return img
 
-def rotatedRect(center,size,image=None,angle=0,color=(255,255,255),lineThickness=3):
+class point:
     """
-    Creates a rotated rectangle on an image
+    Class similar to Poin2f in C++
+    Arguments:
+        coords = (x,y)
+    """
+    def __init__(self,coords):
+        self.x = coords[0]
+        self.y = coords[1]
+    def coords(self):
+        return (self.x,self.y)
+
+class RotatedRect(point):
+    """
+    Class for rotated rectangle
     Arguments:
         image = 3D Numpy array; image on which the border has to be added
         center = (x,y); center of the rotated rectangle
@@ -65,34 +76,51 @@ def rotatedRect(center,size,image=None,angle=0,color=(255,255,255),lineThickness
         color = (B,G,R); color of the border
         lineThickness = integer; thickness of the border
     """
+    def __init__(self,center,size,image=None,angle=0,color=(0,255,0),lineThickness=1):
+        # Center of rectangle
+        self.center = center
+        # Size of rectangle
+        self.size = size
+        # If image argument is not a numpy.ndarray
+        if type(image) != type(np.ones((5,5,3))):
+            image = createBlankCanvas()
+        else:
+            image = image.copy()
+        self.image = image
+        self.color = color
+        self.lineThickness=lineThickness
+        self.angle = angle 
+        self.center = point(center)
+        self.h,self.w = size
+        # Find coordinates of rectangle before rotation
+        verticesOriginal = [(self.center.x-self.w/2, self.center.y-self.h/2),(self.center.x+self.w/2,self.center.y-self.h/2),
+                        (self.center.x+self.w/2,self.center.y+self.h/2),(self.center.x-self.w/2,self.center.y+self.h/2)]
+        # Get coordinates after rotation
+        self.points = [point(((pt[0]-self.center.x)*cos(self.angle)-(pt[1]-self.center.y)*sin(self.angle)+self.center.x,
+                              (pt[0]-self.center.x)*sin(self.angle)+(pt[1]-self.center.y)*cos(self.angle)+self.center.y)) for pt in verticesOriginal] 
+        # Convert vertices to integers
+        self.points = [point((int(pt.x),int(pt.y))) for pt in self.points]
+        # Bounding box
+        min_X = min([pt.x for pt in self.points])
+        min_Y = min([pt.y for pt in self.points])
+        # Get bounding box
+        self.bbox = [min_X,min_Y,int(self.w), int(self.h)]
+    def points(self):
+        return self.points
+
+# Draws the rotated rectangle on image
+def drawRotatedRect(r,image):
     # If image argument is not a numpy.ndarray
     if type(image) != type(np.ones((5,5,3))):
         # Create a black 300x300 px image
         image = createBlankCanvas()
     else:
         image = image.copy()
-    # Convert angle to radians
-    angle = angle*pi/180
-    # Center coordinates
-    centerX,centerY = center
-    # Height and width
-    h,w = size
-    # Original vertices of the rectangle
-    # top left, top right, bottom right, bottom left
-    verticesOriginal = [(centerX-w/2, centerY-h/2),(centerX+w/2,centerY-h/2),
-                        (centerX+w/2,centerY+h/2),(centerX-w/2,centerY+h/2)]
-    newVertices = [((pt[0]-centerX)*cos(angle)-(pt[1]-centerY)*sin(angle)+centerX,(pt[0]-centerX)*sin(angle)+(pt[1]-centerY)*cos(angle)+centerY) for pt in verticesOriginal]
-    # Convert vertices to integers
-    newVertices = [(int(pt[0]),int(pt[1])) for pt in newVertices]
-    for i in range(len(newVertices)):
-        cv2.line(image,newVertices[i],newVertices[(i+1)%len(newVertices)],color,lineThickness)
-    # Bounding box
-    min_X = min([pt[0] for pt in newVertices])
-    min_Y = min([pt[1] for pt in newVertices])
-    max_X = max([pt[0] for pt in newVertices])
-    max_Y = max([pt[1] for pt in newVertices])
-    bbox = [min_X,min_Y,max_X-min_X,max_Y-min_Y]
-    return bbox
+    # Draw rotated rectangle
+    for i in range(len(r.points)):
+        cv2.line(image,r.points[i].coords(),r.points[(i+1)%len(r.points)].coords(),r.color,r.lineThickness)
+    return image
+	
 
 def decode(frame, scores, geometry, scoreThresh):
     
@@ -109,6 +137,9 @@ def decode(frame, scores, geometry, scoreThresh):
     # Initialize detections and confidences
     detections = []
     confidences = []
+	
+	# Initialize list of RotatedRect objects
+    rotatedRectBoxes = []
     
     height = scores.shape[2]
     width = scores.shape[3]
@@ -150,15 +181,18 @@ def decode(frame, scores, geometry, scoreThresh):
             # r should be a rotated rectangle, but it is giving poor results
             # TO BE FIXED
             
-            # r = rotatedRect((0.5 * (p1[0] + p3[0]), 0.5 * (p1[1] + p3[1])), (w, h), frame, -angle)
+            r = RotatedRect(center=(0.5 * (p1[0] + p3[0]), 0.5 * (p1[1] + p3[1])), size=(h, w), angle=-angle,image=frame)
+            # print(r.points,r.bbox)
+            
+            # Append the rotated rectangle
+            rotatedRectBoxes.append(r)
             
             # Append the bounding box rectangle
-            r = [p1[0], p1[1], p3[0], p3[1]]
-            detections.append(r)
+            detections.append(r.bbox)
             # Append score
             confidences.append(float(score))
     # Return detections and confidences
-    return [detections, confidences]
+    return [rotatedRectBoxes,detections, confidences]
     
     
 if __name__ == "__main__":
@@ -185,17 +219,10 @@ if __name__ == "__main__":
     while cv2.waitKey(1) < 0:
         # Read frame
         hasFrame, frame = cap.read()
-        # If frame not found
-        if not hasFrame:
-            cv2.waitKey()
-            break
-        # Get frame height
-        frameHeight = frame.shape[0]
-        # Get frame width
-        frameWidth = frame.shape[1]
         
-        # Resize the frame to input width and height
-        frame = cv2.resize(frame, (inpWidth, inpHeight), interpolation = cv2.INTER_CUBIC)
+        # Get frame height and width
+        height_ = frame.shape[0]
+        width_ = frame.shape[1]
         
         # Create a 4D blob from frame.
         blob = cv2.dnn.blobFromImage(frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
@@ -207,36 +234,28 @@ if __name__ == "__main__":
         # Get scores and geometry
         scores = outs[0]
         geometry = outs[1]
-
-        [boxes, confidences] = decode(frame, scores, geometry, confThreshold)
+    
+        [rotatedRectBoxes, boxes, confidences] = decode(frame, scores, geometry, confThreshold)
+        # Apply NMS
         indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold,nmsThreshold)
-
-        # ratio = (frame.shape[1]/inpWidth, frame.shape[0]/inpHeight)
+    
         for i in range(0, len(indices)):
             # Get the bounding box
             box = boxes[indices[i][0]]
+            # Get the rotated rectangle
+            r = rotatedRectBoxes[indices[i][0]]		
+            # Resize frame
+            frame = cv2.resize(frame, (320, 320), interpolation = cv2.INTER_CUBIC)
             # Draw the bounding box in green
-            cv2.rectangle(frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0))
-            
-            # The following code is not necessary since the frame has already been resized
-            
-            # Get the vertices of the bounding box
-            # vertices = [list(pt) for pt in getPointsFromBoundingBox(box)] 
-            # for j in range(4):
-            #    vertices[j][0] *= ratio[0]
-            #    vertices[j][1] *= ratio[1]
-            # vertices = [list(np.asarray(pt,dtype='uint8')) for pt in vertices]
-            # vertices = [tuple(pt) for pt in vertices]
-            # Plot the rectangle
-            # frame = plotRectFromPoints(vertices,image=frame)
+            frame = drawRotatedRect(r,frame)
         
-        # Resize image back to original height and width
-        frame = cv2.resize(frame, (frameWidth, frameHeight), interpolation = cv2.INTER_CUBIC)
-
         # Put efficiency information
         t, _ = net.getPerfProfile()
         label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
         cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
-        
+        frame = cv2.resize(frame, (width_, height_), interpolation = cv2.INTER_CUBIC)
+    
         # Display the frame
         cv2.imshow(kWinName,frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
