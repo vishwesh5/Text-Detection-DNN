@@ -256,8 +256,10 @@ if __name__ == "__main__":
         blob = cv2.dnn.blobFromImage(frame, 1.0, (inpWidth, inpHeight), (123.68, 116.78, 103.94), True, False)
         
         # Run the model
+	t1 = cv2.getTickCount()
         net.setInput(blob)
         outs = net.forward(outNames)
+	label = 'Inference time: %.2f ms' % ((cv2.getTickCount()-t1)*1000.0/cv2.getTickFrequency())
         
         # Get scores and geometry
         scores = outs[0]
@@ -279,8 +281,7 @@ if __name__ == "__main__":
             frame = drawRotatedRect(r,frame)
         
         # Put efficiency information
-        t, _ = net.getPerfProfile()
-        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
+        #t, _ = net.getPerfProfile()
         cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
     
         # Display the frame
