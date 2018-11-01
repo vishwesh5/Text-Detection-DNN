@@ -103,10 +103,12 @@ int main(int argc, char** argv)
         // true - swap first and last channels in the image (BGR to RGB)
         // false - resize image without cropping and preserving aspect ratio
         blobFromImage(frame, blob, 1.0, Size(inpWidth, inpHeight), Scalar(123.68, 116.78, 103.94), true, false);
+        double t1 = cv::getTickCount();
         // Pass blob as input to EAST
         net.setInput(blob);
         // Make a forward pass
         net.forward(outs, outNames);
+        std::string label = format("Inference time: %.2f ms", (cv::getTickCount()-t1)*1000.0/ cv::getTickFrequency());
         
         // Scores
         Mat scores = outs[0];
@@ -140,12 +142,7 @@ int main(int argc, char** argv)
         }
 
         // Put efficiency information.
-        std::vector<double> layersTimes;
-        double freq = getTickFrequency() / 1000;
-        double t = net.getPerfProfile(layersTimes) / freq;
-        std::string label = format("Inference time: %.2f ms", t);
         putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0));
-
         imshow(kWinName, frame);
     }
     return 0;
