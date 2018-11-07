@@ -122,8 +122,22 @@ def drawRotatedRect(r,image):
     else:
         image = image.copy()
     # Draw rotated rectangle
+    list_points = [] # contains list of coords, used for cropping
     for i in range(len(r.points)):
+        # print("r.points: ", r.points[i].coords()) 
+        list_points.append(list(r.points[i].coords()))
         cv2.line(image,r.points[i].coords(),r.points[(i+1)%len(r.points)].coords(),r.color,r.lineThickness)
+     
+    height = int(np.ceil(np.sqrt((list_points[0][0] - list_points[3][0])**2 + (list_points[0][1] \
+            - list_points[3][1])**2)))
+    width = int(np.ceil(np.sqrt((list_points[0][0] - list_points[1][0])**2 + (list_points[0][1] \
+            - list_points[3][1])**2)))
+    print(height, width)
+    print("list_points", list_points)
+    x = list_points[0][0]
+    y = list_points[0][1]
+    crop_rectangle = image[y:y+height, x:x+width]
+    cv2.imwrite("crop_" + str(np.random.randint(1000, size=1)[0]) + ".jpg", crop_rectangle)
     return image
 
 # Resizes a rotated rectangle object size to frame size
